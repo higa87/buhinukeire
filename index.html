@@ -1,0 +1,818 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>部品受け入れ検査シート</title>
+
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+
+  <style>
+    body {
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+    }
+
+    .field-label {
+      display: block;
+      color: #374151;
+      font-size: 0.875rem;
+      font-weight: 700;
+      margin-bottom: 0.5rem;
+    }
+
+    .input-box {
+      width: 100%;
+      border: 1px solid #d1d5db;
+      border-radius: 0.5rem;
+      padding: 0.75rem;
+      color: #374151;
+      outline: none;
+      background: #fff;
+    }
+
+    .input-box:focus {
+      border-color: #2563eb;
+      box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
+    }
+
+    .check-card {
+      display: grid;
+      grid-template-columns: 44px 1fr;
+      gap: 0.75rem;
+      align-items: start;
+      padding: 0.85rem;
+      border: 1px solid #d1d5db;
+      border-radius: 0.75rem;
+      background: #ffffff;
+      box-shadow: 0 1px 2px rgba(0,0,0,0.04);
+    }
+
+    .check-card input[type="checkbox"] {
+      width: 28px;
+      height: 28px;
+      margin-top: 2px;
+    }
+
+    .remark-input {
+      margin-top: 0.6rem;
+      width: 100%;
+      border: 1px solid #d1d5db;
+      border-radius: 0.5rem;
+      padding: 0.55rem 0.65rem;
+      font-size: 0.9rem;
+      line-height: 1.35;
+      background: #fff;
+      min-height: 44px;
+      resize: vertical;
+    }
+
+    .photo-button input[type="file"] {
+      display: none;
+    }
+
+    .sub-button {
+      background: #ffffff;
+      color: #374151;
+      border: 1px solid #d1d5db;
+      font-weight: 700;
+      padding: 0.85rem 1rem;
+      border-radius: 0.75rem;
+      width: 100%;
+      transition: 0.15s;
+    }
+
+    .sub-button:hover {
+      background: #f9fafb;
+    }
+
+    /* =====================================================
+       PDF出力専用：A4 1ページ固定・Excel風フォーマット
+    ===================================================== */
+    #pdf-print-area {
+      position: fixed;
+      left: -120vw;
+      top: 0;
+      width: 190mm;
+      background: #ffffff;
+      color: #000000;
+      box-sizing: border-box;
+      font-family: "Yu Gothic", "Meiryo", "MS PGothic", sans-serif;
+      padding: 0;
+      visibility: hidden;
+      opacity: 0;
+      pointer-events: none;
+      z-index: -1;
+    }
+
+    .pdf-sheet {
+      width: 190mm;
+      padding: 4mm;
+      box-sizing: border-box;
+      background: #fff;
+    }
+
+    .pdf-title {
+      border: 0.8px solid #111;
+      height: 12mm;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 20px;
+      font-weight: 800;
+      letter-spacing: 0.06em;
+      white-space: nowrap;
+    }
+
+    .pdf-main-table {
+      width: 100%;
+      border-collapse: collapse;
+      table-layout: fixed;
+      border-left: 0.8px solid #111;
+      border-right: 0.8px solid #111;
+      border-bottom: 0.8px solid #111;
+    }
+
+    .pdf-main-table th,
+    .pdf-main-table td {
+      border: 0.8px solid #111;
+      padding: 1.2mm 1.2mm;
+      vertical-align: middle;
+      word-break: break-all;
+      overflow-wrap: anywhere;
+      line-height: 1.2;
+    }
+
+    .pdf-top-label {
+      font-size: 15px;
+      font-weight: 800;
+      text-align: left;
+      height: 11mm;
+      white-space: nowrap;
+    }
+
+    .pdf-top-value {
+      font-size: 14px;
+      font-weight: 700;
+      text-align: left;
+      height: 11mm;
+    }
+
+    .pdf-head th {
+      height: 9mm;
+      font-size: 13px;
+      font-weight: 800;
+      text-align: center;
+      background: #fff;
+      white-space: nowrap;
+      overflow: visible;
+    }
+
+    .pdf-row td {
+      height: 15mm;
+      font-size: 12.5px;
+      font-weight: 700;
+    }
+
+    .pdf-no {
+      text-align: center;
+      font-size: 16px !important;
+      font-weight: 800 !important;
+    }
+
+    .pdf-item {
+      text-align: center;
+      white-space: nowrap;
+    }
+
+    .pdf-content {
+      text-align: left;
+    }
+
+    .pdf-check {
+      text-align: center;
+      font-size: 16px !important;
+      font-weight: 800 !important;
+      line-height: 1 !important;
+      white-space: nowrap;
+      overflow: visible;
+    }
+
+    .pdf-remarks,
+    .pdf-person {
+      text-align: left;
+      font-size: 11.5px !important;
+      font-weight: 700 !important;
+      line-height: 1.18 !important;
+    }
+
+    .pdf-photo-box {
+      width: 100%;
+      height: 116mm;
+      border-left: 0.8px solid #111;
+      border-right: 0.8px solid #111;
+      border-bottom: 0.8px solid #111;
+      position: relative;
+      box-sizing: border-box;
+      overflow: hidden;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: #fff;
+    }
+
+    .pdf-photo-title {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      font-size: 20px;
+      font-weight: 800;
+      letter-spacing: 0.12em;
+      color: #000;
+      z-index: 0;
+      pointer-events: none;
+    }
+
+    .pdf-photo-box img {
+      max-width: 100%;
+      max-height: 100%;
+      object-fit: contain;
+      position: relative;
+      z-index: 1;
+      background: #fff;
+    }
+
+    .pdf-note {
+      border-left: 0.8px solid #111;
+      border-right: 0.8px solid #111;
+      border-bottom: 0.8px solid #111;
+      min-height: 9mm;
+      padding: 1.4mm 1.8mm;
+      font-size: 12.5px;
+      line-height: 1.25;
+      color: #d40000;
+      font-weight: 800;
+      box-sizing: border-box;
+    }
+
+    .pdf-date-line {
+      text-align: right;
+      font-size: 9px;
+      margin-top: 1.2mm;
+      color: #333;
+    }
+  </style>
+</head>
+
+<body class="bg-gray-100 p-4 font-sans">
+
+  <main class="max-w-2xl mx-auto bg-white shadow-lg rounded-xl px-5 sm:px-6 pt-6 pb-8 mb-4">
+    <h1 class="text-gray-800 text-xl font-extrabold mb-6 text-center border-b-4 border-blue-500 pb-2">
+      部品受け入れ検査
+    </h1>
+
+    <section class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
+      <div class="sm:col-span-2">
+        <label for="ui-propertyName" class="field-label">物件名 / 現場名</label>
+        <input id="ui-propertyName" type="text" class="input-box" placeholder="例：〇〇工事">
+      </div>
+
+      <div>
+        <label for="ui-responsibleName" class="field-label">責任者</label>
+        <input id="ui-responsibleName" type="text" class="input-box" placeholder="例：責任者名">
+      </div>
+
+      <div>
+        <label for="ui-personName" class="field-label">担当者</label>
+        <input id="ui-personName" type="text" class="input-box" placeholder="例：検査担当者名">
+      </div>
+    </section>
+
+    <section class="mb-6">
+      <label class="field-label">検査項目（確認済みにチェック・備考は項目別）</label>
+      <div class="bg-gray-50 border rounded-xl p-3 grid grid-cols-1 gap-3">
+        <label class="check-card">
+          <input type="checkbox" id="ui-chk-qty" class="accent-blue-600">
+          <span>
+            <strong>① 数量</strong><br><span class="text-sm text-gray-600">注文した数量が入荷したか</span>
+            <textarea id="ui-remarks-qty" class="remark-input" placeholder="数量の備考　例：初期入荷分"></textarea>
+          </span>
+        </label>
+        <label class="check-card">
+          <input type="checkbox" id="ui-chk-mark" class="accent-blue-600">
+          <span>
+            <strong>② 合番</strong><br><span class="text-sm text-gray-600">合番は記入されているか</span>
+            <textarea id="ui-remarks-mark" class="remark-input" placeholder="合番の備考"></textarea>
+          </span>
+        </label>
+        <label class="check-card">
+          <input type="checkbox" id="ui-chk-material" class="accent-blue-600">
+          <span>
+            <strong>③ 材質</strong><br><span class="text-sm text-gray-600">識別色は塗られているか</span>
+            <textarea id="ui-remarks-material" class="remark-input" placeholder="材質の備考"></textarea>
+          </span>
+        </label>
+        <label class="check-card">
+          <input type="checkbox" id="ui-chk-appearance" class="accent-blue-600">
+          <span>
+            <strong>④ 外観</strong><br><span class="text-sm text-gray-600">曲がり、傷、ひどい錆はないか</span>
+            <textarea id="ui-remarks-appearance" class="remark-input" placeholder="外観の備考"></textarea>
+          </span>
+        </label>
+        <label class="check-card">
+          <input type="checkbox" id="ui-chk-packing" class="accent-blue-600">
+          <span>
+            <strong>⑤ 梱包</strong><br><span class="text-sm text-gray-600">納品の向け先に間違いはないか</span>
+            <textarea id="ui-remarks-packing" class="remark-input" placeholder="梱包の備考"></textarea>
+          </span>
+        </label>
+      </div>
+    </section>
+
+    <section class="mb-6">
+      <label class="field-label">写真添付</label>
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
+        <label class="photo-button bg-blue-100 hover:bg-blue-200 text-blue-800 font-bold py-3 px-4 rounded-lg cursor-pointer text-center border border-blue-300 transition">
+          📷 カメラで撮影
+          <input type="file" accept="image/*" capture="environment" id="photo-cam">
+        </label>
+        <label class="photo-button bg-gray-100 hover:bg-gray-200 text-gray-800 font-bold py-3 px-4 rounded-lg cursor-pointer text-center border border-gray-300 transition">
+          📁 ファイルから選択
+          <input type="file" accept="image/*" id="photo-file">
+        </label>
+      </div>
+
+      <div id="ui-photo-status" class="text-sm text-gray-500 mb-2">写真は未選択です。</div>
+      <div id="ui-preview-container" class="border-2 border-dashed border-gray-300 bg-gray-50 h-56 flex items-center justify-center rounded-lg overflow-hidden">
+        <span class="text-gray-400">画像が選択されていません</span>
+      </div>
+
+      <button type="button" onclick="clearPhoto()" class="mt-3 w-full bg-white hover:bg-gray-50 text-gray-700 font-bold py-2 px-4 rounded-lg border border-gray-300 transition">
+        写真をクリア
+      </button>
+    </section>
+
+    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+      <button onclick="downloadPdfOnly()" id="test-btn" class="sub-button">
+        PDFだけ確認
+      </button>
+      <button onclick="processAndSubmit()" id="submit-btn" class="bg-blue-600 hover:bg-blue-700 text-white font-extrabold py-4 px-4 rounded-lg w-full shadow-lg transition">
+        PDFを出力してGoogleドライブへ保存
+      </button>
+    </div>
+
+    <p class="text-xs text-gray-500 mt-3 leading-relaxed">
+      ※先に「PDFだけ確認」でPDFが1ページで作れるか確認してください。保存できない場合は、下のGASコードも差し替えが必要です。
+    </p>
+  </main>
+
+  <div id="pdf-print-area" aria-hidden="true">
+    <div class="pdf-sheet">
+      <div class="pdf-title">部品受け入れ検査(切板・他下地等)</div>
+
+      <table class="pdf-main-table">
+        <colgroup>
+          <col style="width: 8%;">
+          <col style="width: 14%;">
+          <col style="width: 35%;">
+          <col style="width: 12%;">
+          <col style="width: 17%;">
+          <col style="width: 14%;">
+        </colgroup>
+        <tbody>
+          <tr>
+            <td class="pdf-top-label" colspan="2">物件名</td>
+            <td class="pdf-top-value" colspan="2" id="pdf-propertyName"></td>
+            <td class="pdf-top-label">責任者</td>
+            <td class="pdf-top-value" id="pdf-responsibleName"></td>
+          </tr>
+          <tr class="pdf-head">
+            <th>No</th>
+            <th>確認項目</th>
+            <th>確認内容</th>
+            <th>チェック</th>
+            <th>備考</th>
+            <th>担当者</th>
+          </tr>
+          <tr class="pdf-row">
+            <td class="pdf-no">1</td>
+            <td class="pdf-item">数量</td>
+            <td class="pdf-content">注文した数量が入荷したか</td>
+            <td class="pdf-check" id="pdf-chk-qty"></td>
+            <td class="pdf-remarks" id="pdf-remarks-qty"></td>
+            <td class="pdf-person" id="pdf-person-qty"></td>
+          </tr>
+          <tr class="pdf-row">
+            <td class="pdf-no">2</td>
+            <td class="pdf-item">合番</td>
+            <td class="pdf-content">合番は記入されているか</td>
+            <td class="pdf-check" id="pdf-chk-mark"></td>
+            <td class="pdf-remarks" id="pdf-remarks-mark"></td>
+            <td class="pdf-person" id="pdf-person-mark"></td>
+          </tr>
+          <tr class="pdf-row">
+            <td class="pdf-no">3</td>
+            <td class="pdf-item">材質</td>
+            <td class="pdf-content">識別色は塗られているか</td>
+            <td class="pdf-check" id="pdf-chk-material"></td>
+            <td class="pdf-remarks" id="pdf-remarks-material"></td>
+            <td class="pdf-person" id="pdf-person-material"></td>
+          </tr>
+          <tr class="pdf-row">
+            <td class="pdf-no">4</td>
+            <td class="pdf-item">外観</td>
+            <td class="pdf-content">曲がり、傷、ひどい錆はないか</td>
+            <td class="pdf-check" id="pdf-chk-appearance"></td>
+            <td class="pdf-remarks" id="pdf-remarks-appearance"></td>
+            <td class="pdf-person" id="pdf-person-appearance"></td>
+          </tr>
+          <tr class="pdf-row">
+            <td class="pdf-no">5</td>
+            <td class="pdf-item">梱包</td>
+            <td class="pdf-content">納品の向け先に間違いはないか</td>
+            <td class="pdf-check" id="pdf-chk-packing"></td>
+            <td class="pdf-remarks" id="pdf-remarks-packing"></td>
+            <td class="pdf-person" id="pdf-person-packing"></td>
+          </tr>
+        </tbody>
+      </table>
+
+      <div class="pdf-photo-box" id="pdf-preview-container">
+        <div class="pdf-photo-title">写真</div>
+      </div>
+
+      <div class="pdf-note">
+        ※受け入れ時にレ点チェック・日付・名前を記入。写真は荷姿・合番・識別色・納品向け先等が確認できるように撮影する。
+      </div>
+      <div class="pdf-date-line">検査日：<span id="pdf-date"></span></div>
+    </div>
+  </div>
+
+  <script>
+    // 既存のGASウェブアプリURL。デプロイ設定はそのままでOKです。
+    const GAS_URL = "https://script.google.com/macros/s/AKfycbzk0YeblrObGWYyLDp7BFHh_q-MIB-vKqtbddntMXIzc0ecGyomBuCvFmEVwn6bAZ_a_w/exec";
+
+    let currentImageSrc = null;
+    let currentImageName = "";
+
+    const inspectionItems = [
+      { id: "qty", label: "数量" },
+      { id: "mark", label: "合番" },
+      { id: "material", label: "材質" },
+      { id: "appearance", label: "外観" },
+      { id: "packing", label: "梱包" }
+    ];
+
+    function setText(id, value) {
+      const el = document.getElementById(id);
+      if (el) el.textContent = value || "";
+    }
+
+    function normalizeFileName(name) {
+      return name ? name.replace(/[\\/:*?"<>|]/g, "_") : "写真";
+    }
+
+    function safeFileName(name) {
+      return (name || "未入力").replace(/[\\/:*?"<>|]/g, "_").slice(0, 80);
+    }
+
+    async function handleImageUpload(e, sourceLabel) {
+      const file = e.target.files && e.target.files[0];
+      if (!file) return;
+
+      if (!file.type.startsWith("image/")) {
+        alert("画像ファイルを選択してください。");
+        e.target.value = "";
+        return;
+      }
+
+      try {
+        currentImageName = normalizeFileName(file.name);
+        document.getElementById("ui-photo-status").textContent = `${sourceLabel}：写真を軽量化中...`;
+
+        currentImageSrc = await resizeImageFile(file, 1600, 1200, 0.72);
+
+        document.getElementById("ui-photo-status").textContent = `${sourceLabel}：${currentImageName}`;
+        document.getElementById("ui-preview-container").innerHTML = `
+          <img src="${currentImageSrc}" alt="選択写真" class="max-w-full max-h-full object-contain">
+        `;
+      } catch (err) {
+        console.error(err);
+        alert("写真の読み込みに失敗しました。別の写真で試してください。");
+        clearPhoto();
+      }
+    }
+
+    function fileToDataURL(file) {
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = event => resolve(event.target.result);
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+      });
+    }
+
+    function loadImage(src) {
+      return new Promise((resolve, reject) => {
+        const img = new Image();
+        img.onload = () => resolve(img);
+        img.onerror = reject;
+        img.src = src;
+      });
+    }
+
+    async function resizeImageFile(file, maxWidth, maxHeight, quality) {
+      const dataUrl = await fileToDataURL(file);
+      const img = await loadImage(dataUrl);
+
+      const ratio = Math.min(maxWidth / img.width, maxHeight / img.height, 1);
+      const width = Math.round(img.width * ratio);
+      const height = Math.round(img.height * ratio);
+
+      const canvas = document.createElement("canvas");
+      canvas.width = width;
+      canvas.height = height;
+
+      const ctx = canvas.getContext("2d");
+      ctx.fillStyle = "#ffffff";
+      ctx.fillRect(0, 0, width, height);
+      ctx.drawImage(img, 0, 0, width, height);
+
+      return canvas.toDataURL("image/jpeg", quality);
+    }
+
+    function clearPhoto() {
+      currentImageSrc = null;
+      currentImageName = "";
+      document.getElementById("photo-cam").value = "";
+      document.getElementById("photo-file").value = "";
+      document.getElementById("ui-photo-status").textContent = "写真は未選択です。";
+      document.getElementById("ui-preview-container").innerHTML = '<span class="text-gray-400">画像が選択されていません</span>';
+    }
+
+    document.getElementById("photo-cam").addEventListener("change", function(e) {
+      document.getElementById("photo-file").value = "";
+      handleImageUpload(e, "カメラ撮影");
+    });
+
+    document.getElementById("photo-file").addEventListener("change", function(e) {
+      document.getElementById("photo-cam").value = "";
+      handleImageUpload(e, "ファイル選択");
+    });
+
+    function getFormValues() {
+      const remarks = {};
+      inspectionItems.forEach(item => {
+        const el = document.getElementById(`ui-remarks-${item.id}`);
+        remarks[item.id] = el ? el.value.trim() : "";
+      });
+
+      return {
+        propertyName: document.getElementById("ui-propertyName").value.trim() || "未入力",
+        responsibleName: document.getElementById("ui-responsibleName").value.trim() || "",
+        personName: document.getElementById("ui-personName").value.trim() || "",
+        remarks: remarks
+      };
+    }
+
+    async function downloadPdfOnly() {
+      const btn = document.getElementById("test-btn");
+
+      try {
+        btn.textContent = "PDF作成中...";
+        btn.disabled = true;
+
+        const values = getFormValues();
+        const pdf = await buildPdf(values);
+        pdf.save(`${safeFileName(values.propertyName)}_部品受け入れ検査.pdf`);
+      } catch (error) {
+        console.error(error);
+        alert("PDF確認用データの作成に失敗しました。Consoleのエラーを確認してください。");
+      } finally {
+        btn.textContent = "PDFだけ確認";
+        btn.disabled = false;
+      }
+    }
+
+    async function processAndSubmit() {
+      const btn = document.getElementById("submit-btn");
+
+      try {
+        btn.textContent = "PDF作成中...";
+        btn.disabled = true;
+        btn.classList.add("opacity-50");
+
+        const values = getFormValues();
+        const pdf = await buildPdf(values);
+        const dataUri = pdf.output("datauristring");
+        const rawBase64 = dataUri.split(",")[1];
+        const fileName = `${safeFileName(values.propertyName)}_部品受け入れ検査.pdf`;
+
+        btn.textContent = "Googleドライブへ保存中...";
+
+        const payload = {
+          propertyName: values.propertyName,
+          fileName: fileName,
+          mimeType: "application/pdf",
+          pdfBase64: dataUri,
+          pdfData: rawBase64
+        };
+
+        const result = await sendToGAS(payload);
+
+        if (result.status === "success" || result.status === "ok") {
+          alert("Googleドライブへの保存が完了しました。" + (result.fileUrl ? "\n" + result.fileUrl : ""));
+        } else if (result.status === "unknown") {
+          alert("GASへ送信しました。ただしブラウザ側で完了応答を読めませんでした。Googleドライブ側に保存されているか確認してください。保存されていない場合は、GASコードをv5用に差し替えてください。");
+        } else {
+          alert("GAS側エラー: " + (result.message || "詳細不明"));
+        }
+      } catch (error) {
+        console.error(error);
+        alert(
+          "送信に失敗しました。\n\n" +
+          "1. 左の『PDFだけ確認』でPDFが作れるか確認\n" +
+          "2. PDFが作れる場合は、GAS側のCode.gsをv5用に差し替え\n" +
+          "3. デプロイは既存URLを使う場合『新しいバージョン』で更新してください"
+        );
+      } finally {
+        resetBtn(btn);
+      }
+    }
+
+    async function sendToGAS(payload) {
+      const bodyText = JSON.stringify(payload);
+
+      try {
+        const response = await fetch(GAS_URL, {
+          method: "POST",
+          headers: {
+            "Content-Type": "text/plain;charset=utf-8"
+          },
+          body: bodyText,
+          redirect: "follow"
+        });
+
+        const responseText = await response.text();
+
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}: ${responseText.slice(0, 200)}`);
+        }
+
+        if (!responseText || responseText.trim() === "") {
+          return { status: "success" };
+        }
+
+        try {
+          return JSON.parse(responseText);
+        } catch (jsonError) {
+          const lower = responseText.toLowerCase();
+          if (lower.includes("success") || lower.includes("ok") || lower.includes("完了")) {
+            return { status: "success" };
+          }
+          console.warn("GAS returned non-JSON response:", responseText);
+          return { status: "unknown", message: responseText.slice(0, 200) };
+        }
+      } catch (networkError) {
+        console.warn("通常送信に失敗。no-cors方式で再送します。", networkError);
+
+        await fetch(GAS_URL, {
+          method: "POST",
+          mode: "no-cors",
+          headers: {
+            "Content-Type": "text/plain;charset=utf-8"
+          },
+          body: bodyText
+        });
+
+        return { status: "unknown" };
+      }
+    }
+
+    async function buildPdf(values) {
+      if (!window.html2canvas) {
+        throw new Error("html2canvasが読み込まれていません。ネットワークまたはCDNを確認してください。");
+      }
+      if (!window.jspdf || !window.jspdf.jsPDF) {
+        throw new Error("jsPDFが読み込まれていません。ネットワークまたはCDNを確認してください。");
+      }
+
+      preparePdfLayout(values);
+
+      const sourceElement = document.getElementById("pdf-print-area");
+      const captureElement = sourceElement.cloneNode(true);
+
+      captureElement.id = "pdf-capture-area";
+      captureElement.setAttribute("aria-hidden", "true");
+      captureElement.style.position = "absolute";
+      captureElement.style.left = "0";
+      captureElement.style.top = "0";
+      captureElement.style.width = "190mm";
+      captureElement.style.background = "#ffffff";
+      captureElement.style.visibility = "visible";
+      captureElement.style.opacity = "1";
+      captureElement.style.zIndex = "99999";
+      captureElement.style.pointerEvents = "none";
+      captureElement.style.color = "#000000";
+
+      document.body.appendChild(captureElement);
+
+      try {
+        window.scrollTo(0, 0);
+        await wait(300);
+        await waitForImages(captureElement);
+
+        const canvas = await html2canvas(captureElement, {
+          scale: 1.6,
+          useCORS: true,
+          allowTaint: true,
+          backgroundColor: "#ffffff",
+          logging: false,
+          scrollX: 0,
+          scrollY: 0,
+          windowWidth: captureElement.scrollWidth,
+          windowHeight: captureElement.scrollHeight
+        });
+
+        const imgData = canvas.toDataURL("image/jpeg", 0.9);
+        const { jsPDF } = window.jspdf;
+        const pdf = new jsPDF("p", "mm", "a4");
+
+        const pageWidth = 210;
+        const pageHeight = 297;
+        const margin = 6;
+        const usableWidth = pageWidth - margin * 2;
+        const usableHeight = pageHeight - margin * 2;
+
+        let imgWidth = usableWidth;
+        let imgHeight = (canvas.height * imgWidth) / canvas.width;
+
+        if (imgHeight > usableHeight) {
+          imgHeight = usableHeight;
+          imgWidth = (canvas.width * imgHeight) / canvas.height;
+        }
+
+        const x = (pageWidth - imgWidth) / 2;
+        const y = margin;
+
+        // 1ページ固定。空白の2ページ目を作らない。
+        pdf.addImage(imgData, "JPEG", x, y, imgWidth, imgHeight);
+        return pdf;
+      } finally {
+        if (captureElement && captureElement.parentNode) {
+          captureElement.parentNode.removeChild(captureElement);
+        }
+      }
+    }
+
+    function preparePdfLayout({ propertyName, responsibleName, personName, remarks }) {
+      const today = new Date();
+      const dateText = `${today.getFullYear()}年${today.getMonth() + 1}月${today.getDate()}日`;
+
+      setText("pdf-date", dateText);
+      setText("pdf-propertyName", propertyName);
+      setText("pdf-responsibleName", responsibleName);
+
+      inspectionItems.forEach(item => {
+        const isChecked = document.getElementById(`ui-chk-${item.id}`).checked;
+        setText(`pdf-chk-${item.id}`, isChecked ? "〇" : "未");
+        setText(`pdf-remarks-${item.id}`, remarks[item.id] || "");
+        setText(`pdf-person-${item.id}`, personName);
+      });
+
+      const photoContainer = document.getElementById("pdf-preview-container");
+      if (currentImageSrc) {
+        photoContainer.innerHTML = `<img src="${currentImageSrc}" alt="添付写真">`;
+      } else {
+        photoContainer.innerHTML = '<div class="pdf-photo-title">写真</div>';
+      }
+    }
+
+    function waitForImages(root) {
+      const images = Array.from(root.querySelectorAll("img"));
+      if (images.length === 0) return Promise.resolve();
+
+      return Promise.all(images.map(img => {
+        if (img.complete) return Promise.resolve();
+        return new Promise(resolve => {
+          img.onload = resolve;
+          img.onerror = resolve;
+        });
+      }));
+    }
+
+    function wait(ms) {
+      return new Promise(resolve => setTimeout(resolve, ms));
+    }
+
+    function resetBtn(btn) {
+      btn.textContent = "PDFを出力してGoogleドライブへ保存";
+      btn.disabled = false;
+      btn.classList.remove("opacity-50");
+    }
+  </script>
+</body>
+</html>
